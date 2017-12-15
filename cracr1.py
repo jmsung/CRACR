@@ -18,10 +18,15 @@ import numpy as np
 from PIL import Image
 import matplotlib.pyplot as plt
 import os
+from scipy.optimize import curve_fit
+import scipy
 
 color = 'magma'
 scale_factor = 100
-r_step = 5
+r_step = 20
+
+def error_func(z,a,b,c,d):
+    return a*scipy.special.erfc(b*(z-c))+d  
 
 class Cell(object):
     def __init__(self, cell_name, sample_path):
@@ -44,7 +49,8 @@ class Cell(object):
         I[Ix_mc-1:Ix_mc+1, :] = I.max()
         I[:, Iy_mc-1:Iy_mc+1] = I.max()
         self.intensity_mc = I.copy()       
-        
+                       
+                        
     def radial_intensity(self):
         I = self.intensity.copy()
         x_max = np.size(I, axis=0)
@@ -69,7 +75,12 @@ class Cell(object):
             I_select = I[ix, iy]
             self.Ir[i] = I_select.mean()
             self.Is[i] = I_select.std()
-       
+        
+        p = [max(self.Ir), 1/20, 50, 0]   
+#        self.popt, self.pcov = curve_fit(error_func, self.r, self.Ir, sigma=1/self.Is**2.0)
+        self.popt, self.pcov = curve_fit(error_func, self.r, self.Ir, p0=p)
+        print(self.popt)
+
      
 class Sample(object):
     def __init__(self, sample_name, data_path):
@@ -127,16 +138,26 @@ class Data(object):
             cell_num = sample.cell_num
             for j in range(cell_num):
                 cell = sample.cells[j]
-                plt.figure(cell.cell_name)
-                plt.subplot(231); plt.imshow(cell.intensity, color); plt.colorbar()  
-                plt.subplot(232); plt.imshow(cell.intensity_mc, color) 
-                plt.subplot(234); plt.errorbar(cell.r, cell.Ir, yerr=cell.Is, 
-                                    fmt='o', ecolor='g'); plt.axis([0, 150, 0, 25000])
-                plt.subplot(233); plt.hist([cell.intensity], bins='scott', normed=False, 
-                color='k', histtype='step', linewidth=2); plt.gca().set_yscale("log")
-                         
-            
-            
+                fig = plt.figure(cell.cell_name)
+                
+                sp1 = fig.add_subplot(221)
+                sp1.imshow(cell.intensity, color); 
+                #sp1.colorbar()  
+                
+                sp2 = fig.add_subplot(222)
+                sp2.imshow(cell.intensity_mc, color) 
+                
+                sp3 = fig.add_subplot(223)
+                sp3.errorbar(cell.r, cell.Ir, yerr=cell.Is, fmt='ko', ecolor='k')
+                x = np.linspace(0, max(cell.r), 100)
+                y = error_func(x, cell.popt[0], cell.popt[1], cell.popt[2], cell.popt[3])
+                sp3.plot(x, y, 'r')
+                sp3.axis([0, max(cell.r), 0, max(cell.Ir+cell.Is)])         
+                
+                sp4 = fig.add_subplot(224)
+                sp4.hist([cell.intensity], bins='scott', normed=False, 
+                        color='k', histtype='step', linewidth=2); 
+                sp4.set_yscale("log")                                              
         plt.show()
                       
                           
