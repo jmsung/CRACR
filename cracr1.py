@@ -23,10 +23,10 @@ import scipy
 
 color = 'magma'
 scale_factor = 100
-r_step = 20
+r_step = 6
 
 def error_func(z,a,b,c,d):
-    return a*scipy.special.erfc(b*(z-c))+d  
+    return a*scipy.special.erfc((z-b)/c)+d  
 
 class Cell(object):
     def __init__(self, cell_name, sample_path):
@@ -76,7 +76,7 @@ class Cell(object):
             self.Ir[i] = I_select.mean()
             self.Is[i] = I_select.std()
         
-        p = [max(self.Ir), 1/20, 50, 0]   
+        p = [max(self.Ir), 50, 20, 0]   
 #        self.popt, self.pcov = curve_fit(error_func, self.r, self.Ir, sigma=1/self.Is**2.0)
         self.popt, self.pcov = curve_fit(error_func, self.r, self.Ir, p0=p)
         print(self.popt)
@@ -149,7 +149,7 @@ class Data(object):
                 
                 sp3 = fig.add_subplot(223)
                 sp3.errorbar(cell.r, cell.Ir, yerr=cell.Is, fmt='ko', ecolor='k')
-                x = np.linspace(0, max(cell.r), 100)
+                x = np.linspace(0, max(cell.r)*1.1, 100)
                 y = error_func(x, cell.popt[0], cell.popt[1], cell.popt[2], cell.popt[3])
                 sp3.plot(x, y, 'r')
                 sp3.axis([0, max(cell.r), 0, max(cell.Ir+cell.Is)])         
@@ -157,7 +157,8 @@ class Data(object):
                 sp4 = fig.add_subplot(224)
                 sp4.hist([cell.intensity], bins='scott', normed=False, 
                         color='k', histtype='step', linewidth=2); 
-                sp4.set_yscale("log")                                              
+                sp4.set_yscale("log")     
+            plt.subplots_adjust(wspace=0.3, hspace=0.5)                                         
         plt.show()
                       
                           
