@@ -37,8 +37,18 @@ class Centrosome(object):
         size = centrosome_size
         Iz = np.mean(np.mean(I[:,row-size:row+size,col-size:col+size], axis=2), axis=1)
         self.Iz = Iz - np.min(Iz)
-#        self.Iz = self.Iz / np.max(self.Iz)
-       
+        self.Iz = self.Iz / np.max(self.Iz)
+        
+    def evaluate(self):
+        Iz = self.Iz.copy()
+        Iz[Iz<0.1] = 0
+        dIz = Iz[1:] - Iz[:-1]
+        dIz12 = dIz[1:]*dIz[:-1]
+        if sum(dIz12<0) == 1:
+            return True
+        else:
+            return False
+                   
 class Movie(object):
     def __init__(self, movie_name, movie_path):
         self.movie_name = movie_name    
@@ -81,11 +91,13 @@ class Movie(object):
         self.c_row = self.peak[::-1,0]
         self.c_col = self.peak[::-1,1]
         self.n_centrosomes = len(self.peak[:, 1])
-        print(self.n_centrosomes, 'centrosomes')
+        print(self.n_centrosomes, 'peaks')
         self.centrosomes = []
         for i in range(self.n_centrosomes):
             centrosome = Centrosome(self.I[2], self.c_row[i], self.c_col[i])
-            self.centrosomes.append(centrosome)
+            if centrosome.evaluate():
+                self.centrosomes.append(centrosome)
+        print(len(self.centrosomes), 'centrosomes')
 
 
 class Data(object):
@@ -125,33 +137,53 @@ class Data(object):
             sp2 = fig1.add_subplot(132)     
             sp2.imshow(movie.I_max[2], cmap='plasma')
             sp2.scatter(movie.c_col, movie.c_row, s=150, facecolors='none', edgecolors='y')
-            sp2.set_title('Centrosome')            
+            sp2.set_title('Peaks = %d' % (movie.n_centrosomes))            
             
             sp3 = fig1.add_subplot(133)     
             sp3.imshow(movie.I_max[0], cmap='viridis', alpha=1)            
             sp3.imshow(movie.I_max[2], cmap='plasma', alpha=0.5)
-            sp3.scatter(movie.c_col, movie.c_row, s=150, facecolors='none', edgecolors='y')
-            title = 'Centrosomes = %d' % (movie.n_centrosomes)          
+            
+            centrosomes = movie.centrosomes
+            for j in range(len(movie.centrosomes)):      
+                col = centrosomes[j].col
+                row = centrosomes[j].row
+                sp3.scatter(col, row, s=150, facecolors='none', edgecolors='y')
+            title = 'Centrosomes = %d' % (len(centrosomes))          
             plt.title(title)       
             
             # Figure 2
             fig2 = plt.figure(self.movie_list[i]+'_centrosome')
 
-            Iz_max = []            
-            for j in range(movie.n_centrosomes):
-#            for j in range(1):
+            n_row = 4
+            n_col = 10
+            Iz_max = []    
+            y_sum = np.zeros(movie.n_frame)        
+            for j in range(len(movie.centrosomes)):
                 y = movie.centrosomes[j].Iz
+                y_sum += np.array(y)
                 x = np.arange(0, len(y), 1)
-                tck = interpolate.splrep(x, y, s=0)
+                tck = interpolate.splrep(x, y, s=0)   
                 xnew = np.arange(0, len(y), 0.01)
-                ynew = interpolate.splev(xnew, tck, der=0)
+                ynew = interpolate.splev(xnew, tck, der=0)    
                 Iz_max.append(xnew[np.argmax(ynew)])
-                sp1 = fig2.add_subplot(4, 11,j+1)
-                sp1.plot(x, y, 'x', xnew, ynew)
-                
-#            sp2 = fig2.add_subplot(122)
-#            sp2.plot(Iz_max, 'ko', [np.median(Iz_max)]*movie.n_centrosomes, 'r:')
-                                                                   
+                if j < n_row*n_col:
+                    sp1 = fig2.add_subplot(n_row, n_col,j+1)
+                    sp1.plot(x, y, 'ro', xnew, ynew, 'k')
+
+            tck_sum = interpolate.splrep(x, y_sum, s=0)
+            ynew_sum = interpolate.splev(xnew, tck_sum, der=0)     
+            Iz_max_sum = xnew[np.argmax(ynew_sum)]         
+
+            fig3 = plt.figure(self.movie_list[i]+'_centrosome_height')
+            sp1 = fig3.add_subplot(131) 
+            sp1.plot(Iz_max, 'ko', [np.median(Iz_max)]*len(movie.centrosomes), 'r:')
+            sp2 = fig3.add_subplot(132) 
+            sp2.hist(Iz_max)
+            sp2.set_title('Centrosome height = %.1f' % (np.median(Iz_max)))
+            sp3 = fig3.add_subplot(133)
+            sp3.plot(x, y_sum, 'ro', xnew, ynew_sum, 'k')
+            sp3.set_title('Centrosome height = %.1f' % (Iz_max_sum))
+                                                                           
         plt.show()      
 
 #Covert lab: DeepCell
